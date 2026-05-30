@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vX Replay Tagger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0d12;
+    --surface:   #13171f;
+    --surface-2: #1a2030;
+    --surface-3: #232a3d;
+    --line:      #2a3140;
+    --line-soft: #1f2733;
+    --text:      #e5e7eb;
+    --text-dim:  #9aa0a6;
+    --text-mute: #6b7280;
+    --gold:      #b08841;
+    --gold-bri:  #d4a850;
+
+    --traversal:   #06d6a0;
+    --expansion:   #3a86ff;
+    --compression: #f4d35e;
+    --exhaustion:  #f4a261;
+    --failed:      #e63946;
+    --distortion:  #d62828;
+    --drift:       #6b7280;
+    --neutral:     #4b5563;
+
+    --sync-strong:   #22c55e;
+    --sync-equil:    #3a86ff;
+    --sync-compr:    #f4d35e;
+    --sync-trans:    #f4a261;
+    --sync-conflict: #e63946;
+    --sync-mixed:    #6b7280;
+
+    --tag-led:       #22c55e;
+    --tag-confirmed: #06d6a0;
+    --tag-lagged:    #f4a261;
+    --tag-wrong:     #e63946;
+
+    --font-display: 'IBM Plex Serif', serif;
+    --font-sans:    'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse 800px 400px at 50% -10%, rgba(176,136,65,0.04), transparent),
+      radial-gradient(ellipse 600px 300px at 80% 80%, rgba(58,134,255,0.03), transparent);
+  }
+
+  /* ─── Header ─────────────────────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 24px 36px 20px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 13, 18, 0.85);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .brand h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .brand .tag-line {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .topbar-stats {
+    display: flex;
+    gap: 28px;
+    align-items: baseline;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-value.gold { color: var(--gold-bri); }
+
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ─── Buttons ────────────────────────────────────────────────────── */
+  button, .btn {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 120ms;
+    text-transform: uppercase;
+  }
+  button:hover, .btn:hover {
+    background: var(--surface-2);
+    border-color: var(--gold);
+    color: var(--gold-bri);
+  }
+  button.primary {
+    background: var(--gold);
+    color: var(--bg);
+    border-color: var(--gold);
+    font-weight: 600;
+  }
+  button.primary:hover {
+    background: var(--gold-bri);
+    border-color: var(--gold-bri);
+    color: var(--bg);
+  }
+  button.danger:hover {
+    background: rgba(230, 57, 70, 0.1);
+    color: var(--failed);
+    border-color: var(--failed);
+  }
+  button.ghost {
+    background: transparent;
+    border-color: var(--line);
+  }
+  button:focus-visible {
+    outline: 2px solid var(--gold-bri);
+    outline-offset: 2px;
+  }
+
+  /* ─── Layout ─────────────────────────────────────────────────────── */
+  main {
+    padding: 32px 36px 80px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .card-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0;
+  }
+  .card-subtitle {
+    font-size: 12px;
+    color: var(--text-mute);
+  }
+  .card-body {
+    padding: 24px;
+  }
+
+  /* ─── Form ───────────────────────────────────────────────────────── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px 20px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field-label .req {
+    color: var(--gold);
+  }
+
+  input[type="text"],
+  input[type="datetime-local"],
+  input[type="number"],
+  textarea,
+  select {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 9px 11px;
+    border-radius: 3px;
+    transition: border-color 120ms, background 120ms;
+    width: 100%;
+  }
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--gold);
+    background: rgba(176, 136, 65, 0.04);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-mute);
+    opacity: 0.6;
+  }
+  select {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+                      linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 64px;
+    font-family: var(--font-sans);
+  }
+
+  .col-12 { grid-column: span 12; }
+  .col-6  { grid-column: span 6; }
+  .col-4  { grid-column: span 4; }
+  .col-3  { grid-column: span 3; }
+  .col-2  { grid-column: span 2; }
+
+  @media (max-width: 900px) {
+    .col-6, .col-4, .col-3, .col-2 { grid-column: span 12; }
+  }
+
+  /* ─── Section divider ────────────────────────────────────────────── */
+  .section-divider {
+    grid-column: span 12;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 6px 0 -2px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+  }
+  .section-divider .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    white-space: nowrap;
+  }
+  .section-divider .hint {
+    font-size: 11px;
+    color: var(--text-mute);
+    font-style: italic;
+  }
+
+  /* ─── Form footer ────────────────────────────────────────────────── */
+  .form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .form-footer .hint {
+    font-size: 11px;
+    color: var(--text-mute);
+    font-family: var(--font-mono);
+  }
+  .form-footer .actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  /* ─── Tag tooltips ───────────────────────────────────────────────── */
+  .tag-help {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: rgba(176, 136, 65, 0.06);
+    border-left: 2px solid var(--gold);
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    line-height: 1.5;
+    display: none;
+  }
+  .tag-help.show { display: block; }
+  .tag-help strong { color: var(--gold-bri); }
+
+  /* ─── Events list ────────────────────────────────────────────────── */
+  .events-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line-soft);
+    gap: 12px;
+  }
+  .filter-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .filter-group select {
+    width: auto;
+    padding: 6px 28px 6px 10px;
+    font-size: 11px;
+  }
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .events-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .events-table thead {
+    background: var(--surface-2);
+  }
+  .events-table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    border-bottom: 1px solid var(--line);
+  }
+  .events-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--text-dim);
+    vertical-align: middle;
+  }
+  .events-table tbody tr {
+    transition: background 100ms;
+    cursor: pointer;
+  }
+  .events-table tbody tr:hover {
+    background: var(--surface-2);
+  }
+  .events-table tbody tr td:first-child {
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .events-table .row-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 100ms;
+  }
+  .events-table tbody tr:hover .row-actions {
+    opacity: 1;
+  }
+  .events-table .row-actions button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  /* ─── Badges ─────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bg);
+  }
+  .badge.TRAVERSAL   { background: var(--traversal); }
+  .badge.EXPANSION   { background: var(--expansion); }
+  .badge.COMPRESSION { background: var(--compression); color: #1a1a00; }
+  .badge.EXHAUSTION  { background: var(--exhaustion); }
+  .badge.FAILED      { background: var(--failed); }
+  .badge.DISTORTION  { background: var(--distortion); }
+  .badge.DRIFT       { background: var(--drift); }
+  .badge.NEUTRAL     { background: var(--neutral); }
+
+  .badge.STRONG_SYNC  { background: var(--sync-strong); }
+  .badge.EQUIL_ALIGN  { background: var(--sync-equil); }
+  .badge.COMPR_SYNC   { background: var(--sync-compr); color: #1a1a00; }
+  .badge.TRANSITION   { background: var(--sync-trans); }
+  .badge.CONFLICT     { background: var(--sync-conflict); }
+  .badge.MIXED        { background: var(--sync-mixed); }
+
+  .badge.LED       { background: var(--tag-led); }
+  .badge.CONFIRMED { background: var(--tag-confirmed); }
+  .badge.LAGGED    { background: var(--tag-lagged); }
+  .badge.WRONG     { background: var(--tag-wrong); }
+
+  .badge.session-London { background: var(--surface-3); color: var(--text); border: 1px solid var(--gold); }
+  .badge.session-NY     { background: var(--surface-3); color: var(--text); border: 1px solid var(--expansion); }
+  .badge.session-Tokyo  { background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--line); }
+
+  .empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 13px;
+  }
+  .empty .empty-icon {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    color: var(--line);
+    margin-bottom: 12px;
+    letter-spacing: 0.3em;
+  }
+
+  /* ─── Stats card ─────────────────────────────────────────────────── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .stat-cell {
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+  }
+  .stat-cell-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 8px;
+  }
+  .stat-cell-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    align-items: center;
+  }
+  .stat-cell-grid .name {
+    color: var(--text);
+  }
+  .stat-cell-grid .bar {
+    height: 4px;
+    background: var(--line-soft);
+    position: relative;
+    border-radius: 2px;
+  }
+  .stat-cell-grid .bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+  .stat-cell-grid .n {
+    color: var(--text-dim);
+    text-align: right;
+  }
+  .stat-cell-grid .led-rate {
+    color: var(--sync-strong);
+    font-weight: 600;
+  }
+
+  /* ─── Toast ──────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--surface-2);
+    border: 1px solid var(--gold);
+    color: var(--text);
+    padding: 12px 18px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-radius: 3px;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 200ms ease-out;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .toast.error { border-color: var(--failed); }
+
+  /* ─── Modal ──────────────────────────────────────────────────────── */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 13, 18, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 28px;
+    max-width: 480px;
+    width: calc(100% - 40px);
+  }
+  .modal h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  .modal p {
+    color: var(--text-dim);
+    margin: 0 0 20px;
+    font-size: 13px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  /* ─── Help overlay ───────────────────────────────────────────────── */
+  details.help summary {
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    list-style: none;
+    padding: 4px 0;
+  }
+  details.help summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 14px;
+    color: var(--gold);
+    transition: transform 120ms;
+  }
+  details.help[open] summary::before {
+    transform: rotate(90deg);
+  }
+  details.help .help-body {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-left: 2px solid var(--gold);
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    line-height: 1.7;
+  }
+  details.help .help-body strong { color: var(--gold-bri); }
+
+  /* ─── Score input style ──────────────────────────────────────────── */
+  .score-input {
+    text-align: right;
+  }
+
+  /* ─── Tab labels for direction ───────────────────────────────────── */
+  .dir-arrow {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .dir-arrow.UP { color: var(--traversal); }
+  .dir-arrow.DOWN { color: var(--failed); }
+  .dir-arrow.FLAT, .dir-arrow.SIDEWAYS { color: var(--text-mute); }
+
+  /* ─── Image drop zones ───────────────────────────────────────────── */
+  .img-row {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 4px;
+  }
+  @media (max-width: 700px) {
+    .img-row { grid-template-columns: 1fr; }
+  }
+  .img-dropzone {
+    position: relative;
+    border: 1.5px dashed var(--line);
+    border-radius: 4px;
+    background: var(--bg);
+    min-height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 150ms;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .img-dropzone:hover {
+    border-color: var(--gold);
+    background: rgba(176, 136, 65, 0.04);
+  }
+  .img-dropzone.dragover {
+    border-color: var(--gold-bri);
+    border-style: solid;
+    background: rgba(176, 136, 65, 0.08);
+  }
+  .img-dropzone.has-image {
+    border-style: solid;
+    border-color: var(--traversal);
+    cursor: default;
+  }
+  .img-dropzone-content {
+    text-align: center;
+    padding: 16px;
+    pointer-events: none;
+  }
+  .img-dropzone-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .img-dropzone-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    line-height: 1.5;
+  }
+  .img-dropzone-hint kbd {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 9px;
+    color: var(--text);
+  }
+  .img-preview {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    object-fit: contain;
+    display: block;
+  }
+  .img-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 100ms;
+  }
+  .img-dropzone:hover .img-actions { opacity: 1; }
+  .img-actions button {
+    padding: 4px 8px;
+    font-size: 10px;
+    background: rgba(10, 13, 18, 0.85);
+    backdrop-filter: blur(4px);
+  }
+  .img-meta {
+    position: absolute;
+    bottom: 4px;
+    left: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text);
+    background: rgba(10, 13, 18, 0.7);
+    backdrop-filter: blur(4px);
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Lightbox */
+  .lightbox-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(8px);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+  }
+  .lightbox-bg.show { display: flex; }
+  .lightbox-bg img {
+    max-width: 95vw;
+    max-height: 95vh;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+
+  /* Storage indicator */
+  .storage-meter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .storage-meter .bar {
+    width: 60px;
+    height: 4px;
+    background: var(--line-soft);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .storage-meter .bar-fill {
+    height: 100%;
+    background: var(--traversal);
+    transition: width 200ms, background 200ms;
+  }
+  .storage-meter.warn .bar-fill { background: var(--exhaustion); }
+  .storage-meter.danger .bar-fill { background: var(--failed); }
+
+  /* Thumbnails in events table */
+  .events-table img.thumb {
+    width: 44px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 2px;
+    border: 1px solid var(--line);
+    cursor: zoom-in;
+    transition: transform 100ms, border-color 100ms;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .events-table img.thumb:hover {
+    transform: scale(1.1);
+    border-color: var(--gold);
+  }
+  .thumb-pair {
+    display: inline-flex;
+    gap: 3px;
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <h1>vX Replay Tagger</h1>
+    <span class="tag-line">Empirical Validation · v0.4</span>
+  </div>
+  <div class="topbar-stats">
+    <div class="stat">
+      <div class="stat-label">Events</div>
+      <div class="stat-value gold" id="stat-total">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">LED %</div>
+      <div class="stat-value" id="stat-led">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Session</div>
+      <div class="stat-value" id="stat-session" style="font-size:14px">—</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button onclick="exportCSV()" title="Text-only CSV — no images">↓ CSV</button>
+    <button onclick="exportBundle()" class="primary" title="ZIP with CSV + all screenshots">↓ Bundle (.zip)</button>
+    <button onclick="importCSV()" class="ghost">↑ Import</button>
+    <button onclick="confirmClear()" class="ghost danger" title="Clear all data">⨯ Clear</button>
+  </div>
+</header>
+
+<div id="storage-bar" style="padding:6px 36px;border-bottom:1px solid var(--line-soft);background:rgba(10,13,18,0.6);display:flex;justify-content:flex-end">
+  <div class="storage-meter" id="storage-meter">
+    <span>Storage</span>
+    <div class="bar"><div class="bar-fill" id="storage-fill" style="width:0%"></div></div>
+    <span id="storage-text">0 MB</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- ─── Form ──────────────────────────────────────────────────── -->
+  <section class="card">
+    <div class="card-header">
+      <h2 class="card-title">New Event · #<span id="next-id">1</span></h2>
+      <div class="card-subtitle">
+        <kbd style="font-family:var(--font-mono);font-size:10px;color:var(--text-mute)">⌘ + ↵ to save</kbd>
+      </div>
+    </div>
+    <div class="card-body">
+      <form id="event-form" onsubmit="saveEvent(event)">
+        <div class="form-grid">
+
+          <!-- Meta -->
+          <div class="field col-4">
+            <label class="field-label" for="datetime">Date / Time <span class="req">*</span></label>
+            <input type="datetime-local" id="datetime" name="datetime" required>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="session">Session <span class="req">*</span></label>
+            <select id="session" name="session" required>
+              <option value="">—</option>
+              <option value="Tokyo">Tokyo</option>
+              <option value="London">London</option>
+              <option value="NY">NY</option>
+            </select>
+          </div>
+
+          <!-- Signal capture section -->
+          <div class="section-divider">
+            <span class="label">Signal Bar</span>
+            <span class="hint">Dashboard reading at the bar of state change</span>
+          </div>
+
+          <div class="field col-4">
+            <label class="field-label" for="ltf_state">LTF State <span class="req">*</span></label>
+            <select id="ltf_state" name="ltf_state" required>
+              <option value="">—</option>
+              <option value="TRAVERSAL">Clean Traversal</option>
+              <option value="EXPANSION">Expansion Burst</option>
+              <option value="COMPRESSION">Compression Coil</option>
+              <option value="EXHAUSTION">Exhaustion</option>
+              <option value="FAILED">Failed Traversal</option>
+              <option value="DISTORTION">Volatility Distortion</option>
+              <option value="DRIFT">Equilibrium Drift</option>
+              <option value="NEUTRAL">Neutral</option>
+            </select>
+          </div>
+          <div class="field col-2">
+            <label class="field-label" for="ltf_dir">LTF Dir <span class="req">*</span></label>
+            <select id="ltf_dir" name="ltf_dir" required>
+              <option value="">—</option>
+              <option value="UP">▲ UP</option>
+              <option value="DOWN">▼ DOWN</option>
+              <option value="FLAT">─ FLAT</option>
+            </select>
+          </div>
+          <div class="field col-2">
+            <label class="field-label" for="quality">Quality</label>
+            <input class="score-input" type="number" id="quality" name="quality" min="0" max="100" step="1">
+          </div>
+          <div class="field col-2">
+            <label class="field-label" for="compress">Compress</label>
+            <input class="score-input" type="number" id="compress" name="compress" min="0" max="100" step="1">
+          </div>
+          <div class="field col-2">
+            <label class="field-label" for="expansion">Expansion</label>
+            <input class="score-input" type="number" id="expansion" name="expansion" min="0" max="100" step="1">
+          </div>
+          <div class="field col-2">
+            <label class="field-label" for="exhaust">Exhaust</label>
+            <input class="score-input" type="number" id="exhaust" name="exhaust" min="0" max="100" step="1">
+          </div>
+
+          <div class="field col-3">
+            <label class="field-label" for="htf1_state">HTF1 (60m) State</label>
+            <select id="htf1_state" name="htf1_state">
+              <option value="">—</option>
+              <option value="TRAVERSAL">Clean Traversal</option>
+              <option value="EXPANSION">Expansion Burst</option>
+              <option value="COMPRESSION">Compression Coil</option>
+              <option value="EXHAUSTION">Exhaustion</option>
+              <option value="FAILED">Failed Traversal</option>
+              <option value="DISTORTION">Volatility Distortion</option>
+              <option value="DRIFT">Equilibrium Drift</option>
+              <option value="NEUTRAL">Neutral</option>
+            </select>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="htf1_dir">HTF1 Direction</label>
+            <select id="htf1_dir" name="htf1_dir">
+              <option value="">—</option>
+              <option value="UP">▲ UP</option>
+              <option value="DOWN">▼ DOWN</option>
+              <option value="FLAT">─ FLAT</option>
+            </select>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="htf2_state">HTF2 (240m) State</label>
+            <select id="htf2_state" name="htf2_state">
+              <option value="">—</option>
+              <option value="TRAVERSAL">Clean Traversal</option>
+              <option value="EXPANSION">Expansion Burst</option>
+              <option value="COMPRESSION">Compression Coil</option>
+              <option value="EXHAUSTION">Exhaustion</option>
+              <option value="FAILED">Failed Traversal</option>
+              <option value="DISTORTION">Volatility Distortion</option>
+              <option value="DRIFT">Equilibrium Drift</option>
+              <option value="NEUTRAL">Neutral</option>
+            </select>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="htf2_dir">HTF2 Direction</label>
+            <select id="htf2_dir" name="htf2_dir">
+              <option value="">—</option>
+              <option value="UP">▲ UP</option>
+              <option value="DOWN">▼ DOWN</option>
+              <option value="FLAT">─ FLAT</option>
+            </select>
+          </div>
+
+          <div class="field col-4">
+            <label class="field-label" for="sync">Sync State</label>
+            <select id="sync" name="sync">
+              <option value="">—</option>
+              <option value="STRONG_SYNC">STRONG_SYNC</option>
+              <option value="EQUIL_ALIGN">EQUIL_ALIGN</option>
+              <option value="COMPR_SYNC">COMPR_SYNC</option>
+              <option value="TRANSITION">TRANSITION</option>
+              <option value="CONFLICT">CONFLICT</option>
+              <option value="MIXED">MIXED</option>
+            </select>
+          </div>
+          <div class="field col-4">
+            <label class="field-label" for="context">Context</label>
+            <select id="context" name="context">
+              <option value="">—</option>
+              <option value="Macro Aligned">Macro Aligned</option>
+              <option value="Setup Loading">Setup Loading</option>
+              <option value="Pullback in Trend">Pullback in Trend</option>
+              <option value="Consolidation">Consolidation</option>
+              <option value="Counter-Trend">Counter-Trend</option>
+              <option value="Equilibrium">Equilibrium</option>
+              <option value="Direction Conflict">Direction Conflict</option>
+              <option value="Mixed">Mixed</option>
+            </select>
+          </div>
+          <div class="field col-4">
+            <label class="field-label" for="memory">Memory zones (#)</label>
+            <input class="score-input" type="number" id="memory" name="memory" min="0" step="1" placeholder="0">
+          </div>
+
+          <!-- Outcome section -->
+          <div class="section-divider">
+            <span class="label">Outcome (after stepping forward 6 bars / 30 min)</span>
+            <span class="hint">apply 6-bar / 1-ATR rule honestly</span>
+          </div>
+
+          <div class="field col-3">
+            <label class="field-label" for="tag">Tag <span class="req">*</span></label>
+            <select id="tag" name="tag" required onchange="toggleTagHelp()">
+              <option value="">—</option>
+              <option value="LED">LED · engine called early</option>
+              <option value="CONFIRMED">CONFIRMED · descriptive</option>
+              <option value="LAGGED">LAGGED · fired late</option>
+              <option value="WRONG">WRONG · failed / opposite</option>
+            </select>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="outcome_dir">Outcome Direction</label>
+            <select id="outcome_dir" name="outcome_dir">
+              <option value="">—</option>
+              <option value="UP">▲ UP</option>
+              <option value="DOWN">▼ DOWN</option>
+              <option value="SIDEWAYS">─ SIDEWAYS</option>
+            </select>
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="outcome_atr">Move size (ATR)</label>
+            <input class="score-input" type="number" id="outcome_atr" name="outcome_atr" min="0" step="0.1" placeholder="0.0">
+          </div>
+          <div class="field col-3">
+            <label class="field-label" for="screenshot">Screenshot ID</label>
+            <input type="text" id="screenshot" name="screenshot" placeholder="auto-named" readonly style="opacity:0.6">
+          </div>
+
+          <!-- Image drop zones -->
+          <div class="img-row">
+            <div class="img-dropzone" id="dz-signal" data-kind="signal" tabindex="0">
+              <div class="img-dropzone-content">
+                <div class="img-dropzone-label">▸ Signal Bar Screenshot</div>
+                <div class="img-dropzone-hint">
+                  <kbd>⌘V</kbd> paste · drag &amp; drop · or click to browse
+                </div>
+              </div>
+              <input type="file" accept="image/*" hidden>
+            </div>
+            <div class="img-dropzone" id="dz-outcome" data-kind="outcome" tabindex="0">
+              <div class="img-dropzone-content">
+                <div class="img-dropzone-label">▸ Outcome +6 Bars Screenshot</div>
+                <div class="img-dropzone-hint">
+                  <kbd>⌘V</kbd> paste · drag &amp; drop · or click to browse
+                </div>
+              </div>
+              <input type="file" accept="image/*" hidden>
+            </div>
+          </div>
+
+          <div class="field col-12">
+            <label class="field-label" for="notes">Notes</label>
+            <textarea id="notes" name="notes" placeholder="news event, anomaly, observations..."></textarea>
+          </div>
+
+          <div class="col-12">
+            <details class="help">
+              <summary>Tag definitions reference</summary>
+              <div class="help-body">
+                <p><strong>LED</strong> — Engine signaled before the move; price followed within 6 bars by ≥ 1 ATR.</p>
+                <p><strong>CONFIRMED</strong> — Engine fired during/after move; useful as confirmation but not predictive. Default for COMPRESSION and DRIFT states unless a break follows.</p>
+                <p><strong>LAGGED</strong> — Engine fired after the move was substantially complete (≥ 80%).</p>
+                <p><strong>WRONG</strong> — Price moved opposite by ≥ 0.5 ATR, or no meaningful move at all.</p>
+                <p style="margin-top:10px"><strong>Honesty check:</strong> if you're between two tags, pick the worse one.</p>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <div class="hint" id="edit-hint"></div>
+          <div class="actions">
+            <button type="button" class="ghost" onclick="resetForm()">Clear Form</button>
+            <button type="submit" class="primary" id="save-btn">Save Event</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ─── Stats ─────────────────────────────────────────────────── -->
+  <section class="card" id="stats-card" style="display:none">
+    <div class="card-header">
+      <h2 class="card-title">Live Stats</h2>
+      <div class="card-subtitle">Updates as you tag · meaningful at n ≥ 30 per state</div>
+    </div>
+    <div class="card-body">
+      <div class="stats-grid" id="stats-grid"></div>
+    </div>
+  </section>
+
+  <!-- ─── Events list ───────────────────────────────────────────── -->
+  <section class="card">
+    <div class="events-toolbar">
+      <h2 class="card-title" style="margin:0">Tagged Events</h2>
+      <div class="filter-group">
+        <span class="filter-label">Filter</span>
+        <select id="filter-session" onchange="renderEvents()">
+          <option value="">All sessions</option>
+          <option value="Tokyo">Tokyo</option>
+          <option value="London">London</option>
+          <option value="NY">NY</option>
+        </select>
+        <select id="filter-state" onchange="renderEvents()">
+          <option value="">All states</option>
+          <option value="TRAVERSAL">TRAVERSAL</option>
+          <option value="EXPANSION">EXPANSION</option>
+          <option value="COMPRESSION">COMPRESSION</option>
+          <option value="EXHAUSTION">EXHAUSTION</option>
+          <option value="FAILED">FAILED</option>
+          <option value="DISTORTION">DISTORTION</option>
+          <option value="DRIFT">DRIFT</option>
+          <option value="NEUTRAL">NEUTRAL</option>
+        </select>
+        <select id="filter-tag" onchange="renderEvents()">
+          <option value="">All tags</option>
+          <option value="LED">LED</option>
+          <option value="CONFIRMED">CONFIRMED</option>
+          <option value="LAGGED">LAGGED</option>
+          <option value="WRONG">WRONG</option>
+        </select>
+      </div>
+    </div>
+    <div id="events-list"></div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h2 id="modal-title">Confirm</h2>
+    <p id="modal-text">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="ghost" onclick="hideModal()">Cancel</button>
+      <button class="primary" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+
+<div class="lightbox-bg" id="lightbox" onclick="this.classList.remove('show')">
+  <img id="lightbox-img" alt="">
+</div>
+
+<script>
+// ============================================================================
+// STATE
+// ============================================================================
+const FIELDS = [
+  'event_id', 'datetime', 'session',
+  'ltf_state', 'ltf_dir', 'quality', 'compress', 'expansion', 'exhaust',
+  'htf1_state', 'htf1_dir', 'htf2_state', 'htf2_dir',
+  'sync', 'context', 'memory',
+  'tag', 'outcome_dir', 'outcome_atr',
+  'notes', 'screenshot'
+];
+
+let events = JSON.parse(localStorage.getItem('vx_events') || '[]');
+let editingId = null;
+
+// Pending images for the current event (before save). Keyed by 'signal' / 'outcome'.
+let pendingImages = {};
+
+// ============================================================================
+// INDEXEDDB — for screenshot storage (5–10MB localStorage too small)
+// ============================================================================
+const DB_NAME = 'vx_replay';
+const DB_VERSION = 1;
+const STORE = 'images';
+let _db = null;
+
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbSet(key, value) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put({ key, value });
+    tx.oncomplete = resolve;
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbGet(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbDelete(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = resolve;
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbGetAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbClear() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function imgKey(eventId, kind) {
+  return `e${eventId}_${kind}`;
+}
+
+// ============================================================================
+// IMAGE COMPRESSION — Canvas pipeline
+// ============================================================================
+async function fileToBase64Compressed(file, maxWidth = 1600, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0a0d12';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl);
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function base64Size(dataUrl) {
+  // Approximate byte size of base64 string (excluding the data URL prefix)
+  const b64 = (dataUrl || '').split(',')[1] || '';
+  return Math.floor(b64.length * 0.75);
+}
+
+// ============================================================================
+// IMAGE INPUT HANDLING — paste / drop / browse
+// ============================================================================
+async function handleImageFile(file, kind) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Not an image', 'error');
+    return;
+  }
+  try {
+    const dataUrl = await fileToBase64Compressed(file);
+    pendingImages[kind] = dataUrl;
+    renderDropzone(kind, dataUrl);
+    updateStorageMeter();
+  } catch (err) {
+    showToast('Image error: ' + err.message, 'error');
+  }
+}
+
+function renderDropzone(kind, dataUrl) {
+  const dz = document.getElementById(`dz-${kind}`);
+  if (!dz) return;
+  if (!dataUrl) {
+    dz.classList.remove('has-image');
+    dz.innerHTML = `
+      <div class="img-dropzone-content">
+        <div class="img-dropzone-label">▸ ${kind === 'signal' ? 'Signal Bar' : 'Outcome +6 Bars'} Screenshot</div>
+        <div class="img-dropzone-hint">
+          <kbd>⌘V</kbd> paste · drag &amp; drop · or click to browse
+        </div>
+      </div>
+      <input type="file" accept="image/*" hidden>
+    `;
+    wireDropzone(dz);
+    return;
+  }
+  dz.classList.add('has-image');
+  const sizeKB = Math.round(base64Size(dataUrl) / 1024);
+  dz.innerHTML = `
+    <img class="img-preview" src="${dataUrl}" alt="${kind}">
+    <div class="img-meta">${kind.toUpperCase()} · ${sizeKB} KB</div>
+    <div class="img-actions">
+      <button type="button" onclick="event.stopPropagation();zoomImage('${kind}')">🔍</button>
+      <button type="button" class="danger" onclick="event.stopPropagation();removeImage('${kind}')">✕</button>
+    </div>
+  `;
+}
+
+function zoomImage(kind) {
+  const url = pendingImages[kind];
+  if (!url) return;
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.classList.add('show');
+}
+
+function removeImage(kind) {
+  delete pendingImages[kind];
+  renderDropzone(kind, null);
+  updateStorageMeter();
+}
+
+function wireDropzone(dz) {
+  const kind = dz.dataset.kind;
+  const fileInput = dz.querySelector('input[type=file]');
+  // Click to browse — but not on the action buttons
+  dz.onclick = (e) => {
+    if (e.target.closest('button')) return;
+    if (dz.classList.contains('has-image')) return;
+    fileInput.click();
+  };
+  fileInput.onchange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleImageFile(e.target.files[0], kind);
+    }
+  };
+  // Drag and drop
+  dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('dragover'); };
+  dz.ondragleave = () => { dz.classList.remove('dragover'); };
+  dz.ondrop = (e) => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) handleImageFile(file, kind);
+  };
+}
+
+// Paste handler — routes pasted images to whichever dropzone is focused, or signal by default
+let pasteTarget = 'signal';
+function setupPasteRouting() {
+  ['dz-signal', 'dz-outcome'].forEach(id => {
+    const dz = document.getElementById(id);
+    if (dz) {
+      dz.addEventListener('focus', () => { pasteTarget = dz.dataset.kind; });
+      dz.addEventListener('mouseenter', () => { pasteTarget = dz.dataset.kind; });
+    }
+  });
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleImageFile(file, pasteTarget);
+          showToast(`Pasted to ${pasteTarget}`);
+          return;
+        }
+      }
+    }
+  });
+}
+
+// ============================================================================
+// STORAGE METER
+// ============================================================================
+async function updateStorageMeter() {
+  try {
+    const all = await dbGetAll();
+    let bytes = 0;
+    all.forEach(rec => { bytes += base64Size(rec.value); });
+    Object.values(pendingImages).forEach(v => { bytes += base64Size(v); });
+    bytes += JSON.stringify(events).length;
+    const mb = bytes / (1024 * 1024);
+    // Use 200MB as soft ceiling reference for the bar
+    const pct = Math.min(100, (mb / 200) * 100);
+    const fill = document.getElementById('storage-fill');
+    const text = document.getElementById('storage-text');
+    const meter = document.getElementById('storage-meter');
+    if (fill) fill.style.width = pct + '%';
+    if (text) text.textContent = mb.toFixed(1) + ' MB';
+    if (meter) {
+      meter.classList.toggle('warn', mb > 100);
+      meter.classList.toggle('danger', mb > 175);
+    }
+  } catch (err) {
+    // Silently ignore meter errors
+  }
+}
+
+// ============================================================================
+// PERSISTENCE
+// ============================================================================
+function saveEvents() {
+  localStorage.setItem('vx_events', JSON.stringify(events));
+}
+
+function saveDraft() {
+  const data = getFormData();
+  localStorage.setItem('vx_draft', JSON.stringify(data));
+}
+
+function loadDraft() {
+  const draft = JSON.parse(localStorage.getItem('vx_draft') || '{}');
+  for (const [k, v] of Object.entries(draft)) {
+    const el = document.getElementById(k === 'sync' ? 'sync' : k);
+    if (el && v !== undefined && v !== null) el.value = v;
+  }
+}
+
+function clearDraft() {
+  localStorage.removeItem('vx_draft');
+}
+
+// ============================================================================
+// FORM
+// ============================================================================
+function getFormData() {
+  const data = {};
+  const form = document.getElementById('event-form');
+  const formData = new FormData(form);
+  for (const [k, v] of formData.entries()) {
+    data[k] = v;
+  }
+  return data;
+}
+
+function fillForm(event) {
+  for (const f of FIELDS) {
+    const el = document.getElementById(f);
+    if (el) el.value = event[f] ?? '';
+  }
+}
+
+function nextEventId() {
+  if (events.length === 0) return 1;
+  return Math.max(...events.map(e => parseInt(e.event_id) || 0)) + 1;
+}
+
+async function saveEvent(e) {
+  e.preventDefault();
+  const data = getFormData();
+
+  // Validation
+  if (!data.datetime || !data.session || !data.ltf_state || !data.ltf_dir || !data.tag) {
+    showToast('Fill required fields (datetime, session, state, dir, tag)', 'error');
+    return;
+  }
+
+  let savedId;
+  if (editingId !== null) {
+    // Update existing
+    const idx = events.findIndex(e => e.event_id == editingId);
+    if (idx >= 0) {
+      events[idx] = { ...events[idx], ...data, event_id: editingId };
+    }
+    savedId = editingId;
+    showToast(`Event #${editingId} updated`);
+  } else {
+    // Create new
+    data.event_id = nextEventId();
+    events.push(data);
+    savedId = data.event_id;
+    showToast(`Event #${data.event_id} saved`);
+  }
+
+  // Persist images
+  try {
+    for (const kind of ['signal', 'outcome']) {
+      if (pendingImages[kind]) {
+        await dbSet(imgKey(savedId, kind), pendingImages[kind]);
+      }
+    }
+    // Auto-set screenshot filename reference
+    const idx = events.findIndex(e => e.event_id == savedId);
+    if (idx >= 0) {
+      const parts = [];
+      if (pendingImages.signal) parts.push(`event_${String(savedId).padStart(3,'0')}_signal.jpg`);
+      if (pendingImages.outcome) parts.push(`event_${String(savedId).padStart(3,'0')}_outcome.jpg`);
+      if (parts.length) events[idx].screenshot = parts.join(' | ');
+    }
+  } catch (err) {
+    showToast('Image save failed: ' + err.message, 'error');
+  }
+
+  saveEvents();
+  clearDraft();
+  resetForm();
+  renderAll();
+  updateStorageMeter();
+}
+
+function resetForm() {
+  document.getElementById('event-form').reset();
+  editingId = null;
+  pendingImages = {};
+  renderDropzone('signal', null);
+  renderDropzone('outcome', null);
+  document.getElementById('save-btn').textContent = 'Save Event';
+  document.getElementById('edit-hint').textContent = '';
+  document.getElementById('next-id').textContent = nextEventId();
+  // Pre-fill datetime to now
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+  clearDraft();
+}
+
+async function editEvent(id) {
+  const ev = events.find(e => e.event_id == id);
+  if (!ev) return;
+  editingId = id;
+  fillForm(ev);
+  document.getElementById('save-btn').textContent = 'Update Event';
+  document.getElementById('edit-hint').textContent = `Editing event #${id}`;
+  // Load images for this event
+  pendingImages = {};
+  for (const kind of ['signal', 'outcome']) {
+    try {
+      const data = await dbGet(imgKey(id, kind));
+      if (data) {
+        pendingImages[kind] = data;
+        renderDropzone(kind, data);
+      } else {
+        renderDropzone(kind, null);
+      }
+    } catch (err) {
+      renderDropzone(kind, null);
+    }
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteEvent(id) {
+  showModal(
+    'Delete event?',
+    `Event #${id} will be permanently removed.`,
+    async () => {
+      events = events.filter(e => e.event_id != id);
+      saveEvents();
+      try {
+        await dbDelete(imgKey(id, 'signal'));
+        await dbDelete(imgKey(id, 'outcome'));
+      } catch (err) { /* ignore */ }
+      renderAll();
+      updateStorageMeter();
+      showToast(`Event #${id} deleted`);
+    }
+  );
+}
+
+// ============================================================================
+// RENDER
+// ============================================================================
+function renderEvents() {
+  const list = document.getElementById('events-list');
+  const fSession = document.getElementById('filter-session').value;
+  const fState = document.getElementById('filter-state').value;
+  const fTag = document.getElementById('filter-tag').value;
+
+  let filtered = [...events];
+  if (fSession) filtered = filtered.filter(e => e.session === fSession);
+  if (fState) filtered = filtered.filter(e => e.ltf_state === fState);
+  if (fTag) filtered = filtered.filter(e => e.tag === fTag);
+  filtered.sort((a, b) => (b.event_id || 0) - (a.event_id || 0));
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">⊘</div>
+        ${events.length === 0
+          ? 'No events tagged yet. Start with your first state transition.'
+          : 'No events match the current filter.'}
+      </div>
+    `;
+    return;
+  }
+
+  const arrow = (d) => `<span class="dir-arrow ${d}">${d === 'UP' ? '▲' : d === 'DOWN' ? '▼' : '─'}</span>`;
+
+  // Flag a tag that may violate the 6-bar / 1-ATR rule based on direction match
+  const ruleCheck = (e) => {
+    if (!e.ltf_dir || !e.outcome_dir || !e.outcome_atr || !e.tag) return '';
+    const atr = parseFloat(e.outcome_atr);
+    if (isNaN(atr)) return '';
+    // States with no expected direction
+    if (['COMPRESSION', 'DRIFT', 'NEUTRAL', 'DISTORTION'].includes(e.ltf_state)) return '';
+    // Direction matches?
+    const dirMatch = e.ltf_dir === e.outcome_dir;
+    const sideways = e.outcome_dir === 'SIDEWAYS';
+    let suggested = null;
+    if (dirMatch && atr >= 1.0) suggested = ['LED', 'CONFIRMED'];
+    else if (sideways || atr < 0.5) suggested = ['CONFIRMED', 'WRONG'];
+    else if (!dirMatch && atr >= 0.5) suggested = ['WRONG'];
+    if (suggested && !suggested.includes(e.tag)) {
+      return `<span title="Rule suggests: ${suggested.join(' or ')}" style="color:var(--failed);font-weight:700;margin-left:4px">⚠</span>`;
+    }
+    return '';
+  };
+
+  const rows = filtered.map(e => `
+    <tr onclick="editEvent(${e.event_id})" data-event-id="${e.event_id}">
+      <td>#${String(e.event_id).padStart(3, '0')}</td>
+      <td>${(e.datetime || '').replace('T', ' ')}</td>
+      <td><span class="badge session-${e.session}">${e.session || '—'}</span></td>
+      <td>${e.ltf_state ? `<span class="badge ${e.ltf_state}">${e.ltf_state}</span> ${e.ltf_dir ? arrow(e.ltf_dir) : ''}` : '—'}</td>
+      <td style="color:var(--text)">${e.quality || ''} / ${e.compress || ''} / ${e.expansion || ''} / ${e.exhaust || ''}</td>
+      <td>${e.sync ? `<span class="badge ${e.sync}">${e.sync}</span>` : '—'}</td>
+      <td>${e.context || '—'}</td>
+      <td>${e.tag ? `<span class="badge ${e.tag}">${e.tag}</span>${ruleCheck(e)}` : '—'}</td>
+      <td>${e.outcome_dir ? arrow(e.outcome_dir) : '—'} <span style="color:var(--text-mute)">${e.outcome_atr ? e.outcome_atr + ' ATR' : ''}</span></td>
+      <td><div class="thumb-pair" data-thumbs-for="${e.event_id}"></div></td>
+      <td>
+        <div class="row-actions">
+          <button onclick="event.stopPropagation();deleteEvent(${e.event_id})" class="danger">DEL</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  list.innerHTML = `
+    <table class="events-table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Datetime</th><th>Sess</th><th>State</th>
+          <th>Q/C/X/E</th><th>Sync</th><th>Context</th>
+          <th>Tag</th><th>Outcome</th><th>Imgs</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  // Lazy-load thumbnails after table renders
+  filtered.forEach(async (e) => {
+    const container = document.querySelector(`[data-thumbs-for="${e.event_id}"]`);
+    if (!container) return;
+    for (const kind of ['signal', 'outcome']) {
+      try {
+        const url = await dbGet(imgKey(e.event_id, kind));
+        if (url) {
+          const img = document.createElement('img');
+          img.className = 'thumb';
+          img.src = url;
+          img.alt = kind;
+          img.title = kind === 'signal' ? 'Signal bar' : 'Outcome +6 bars';
+          img.onclick = (ev) => {
+            ev.stopPropagation();
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox').classList.add('show');
+          };
+          container.appendChild(img);
+        }
+      } catch (err) { /* ignore */ }
+    }
+  });
+}
+
+function renderTopStats() {
+  document.getElementById('stat-total').textContent = events.length;
+
+  const ledCount = events.filter(e => e.tag === 'LED').length;
+  const taggable = events.filter(e => ['LED', 'CONFIRMED', 'LAGGED', 'WRONG'].includes(e.tag)).length;
+  const ledRate = taggable > 0 ? Math.round(100 * ledCount / taggable) + '%' : '—';
+  document.getElementById('stat-led').textContent = ledRate;
+
+  // Show session breakdown
+  const sessions = {};
+  events.forEach(e => {
+    if (e.session) sessions[e.session] = (sessions[e.session] || 0) + 1;
+  });
+  const sessionStr = Object.entries(sessions)
+    .map(([k, v]) => `${k} ${v}`)
+    .join(' · ');
+  document.getElementById('stat-session').textContent = sessionStr || '—';
+}
+
+function renderStats() {
+  if (events.length < 5) {
+    document.getElementById('stats-card').style.display = 'none';
+    return;
+  }
+  document.getElementById('stats-card').style.display = 'block';
+
+  const grid = document.getElementById('stats-grid');
+
+  // Per-state breakdown
+  const byState = {};
+  events.forEach(e => {
+    if (!e.ltf_state) return;
+    if (!byState[e.ltf_state]) byState[e.ltf_state] = { total: 0, LED: 0, CONFIRMED: 0, LAGGED: 0, WRONG: 0 };
+    byState[e.ltf_state].total += 1;
+    if (e.tag) byState[e.ltf_state][e.tag] = (byState[e.ltf_state][e.tag] || 0) + 1;
+  });
+
+  const stateCard = (state, data) => {
+    const ledRate = data.total > 0 ? Math.round(100 * data.LED / data.total) : 0;
+    return `
+      <div class="stat-cell">
+        <div class="stat-cell-label">
+          <span class="badge ${state}">${state}</span>
+          <span style="float:right;color:var(--text-dim);font-family:var(--font-mono)">n=${data.total}</span>
+        </div>
+        <div class="stat-cell-grid">
+          <span class="name">LED</span>
+          <span class="bar"><span class="bar-fill" style="width:${100 * data.LED / data.total}%;background:var(--tag-led)"></span></span>
+          <span class="n">${data.LED}</span>
+
+          <span class="name">CONFIRMED</span>
+          <span class="bar"><span class="bar-fill" style="width:${100 * data.CONFIRMED / data.total}%;background:var(--tag-confirmed)"></span></span>
+          <span class="n">${data.CONFIRMED}</span>
+
+          <span class="name">LAGGED</span>
+          <span class="bar"><span class="bar-fill" style="width:${100 * data.LAGGED / data.total}%;background:var(--tag-lagged)"></span></span>
+          <span class="n">${data.LAGGED}</span>
+
+          <span class="name">WRONG</span>
+          <span class="bar"><span class="bar-fill" style="width:${100 * data.WRONG / data.total}%;background:var(--tag-wrong)"></span></span>
+          <span class="n">${data.WRONG}</span>
+
+          <span class="name" style="grid-column:1/-1;text-align:right;padding-top:6px;color:var(--text-mute);font-size:10px">
+            LED-RATE <span class="led-rate" style="color:${ledRate >= 55 ? 'var(--sync-strong)' : ledRate >= 40 ? 'var(--exhaustion)' : 'var(--text-mute)'}">${ledRate}%</span>
+          </span>
+        </div>
+      </div>
+    `;
+  };
+
+  grid.innerHTML = Object.entries(byState)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([state, data]) => stateCard(state, data))
+    .join('');
+}
+
+function renderAll() {
+  document.getElementById('next-id').textContent = nextEventId();
+  renderEvents();
+  renderTopStats();
+  renderStats();
+}
+
+// ============================================================================
+// CSV EXPORT / IMPORT
+// ============================================================================
+function exportCSV() {
+  if (events.length === 0) {
+    showToast('No events to export', 'error');
+    return;
+  }
+  const csv = buildCSV();
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `vx_replay_${stamp}_n${events.length}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${events.length} events`);
+}
+
+function buildCSV() {
+  const headers = FIELDS;
+  const csvEscape = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+  const rows = events.map(e => headers.map(h => csvEscape(e[h])).join(','));
+  return [headers.join(','), ...rows].join('\n');
+}
+
+async function exportBundle() {
+  if (events.length === 0) {
+    showToast('No events to export', 'error');
+    return;
+  }
+  if (typeof JSZip === 'undefined') {
+    showToast('ZIP library not loaded — check internet connection', 'error');
+    return;
+  }
+  showToast('Building bundle...');
+  try {
+    const zip = new JSZip();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const folderName = `vx_replay_${stamp}_n${events.length}`;
+    const folder = zip.folder(folderName);
+
+    // CSV
+    folder.file('events.csv', buildCSV());
+
+    // README
+    folder.file('README.txt',
+`vX Replay Tagger Bundle
+Exported: ${new Date().toISOString()}
+Events:   ${events.length}
+
+events.csv — full tagged event log
+screenshots/ — chart screenshots, named event_NNN_signal.jpg / event_NNN_outcome.jpg
+
+Send this entire ZIP to Claude for batch review.
+`);
+
+    // Screenshots
+    const imgsFolder = folder.folder('screenshots');
+    let imgCount = 0;
+    for (const ev of events) {
+      const id = ev.event_id;
+      for (const kind of ['signal', 'outcome']) {
+        try {
+          const url = await dbGet(imgKey(id, kind));
+          if (url) {
+            const b64 = url.split(',')[1];
+            const filename = `event_${String(id).padStart(3, '0')}_${kind}.jpg`;
+            imgsFolder.file(filename, b64, { base64: true });
+            imgCount++;
+          }
+        } catch (err) { /* skip */ }
+      }
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${folderName}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Bundle: ${events.length} events, ${imgCount} images`);
+  } catch (err) {
+    showToast('Bundle error: ' + err.message, 'error');
+  }
+}
+
+function importCSV() {
+  document.getElementById('csv-file').click();
+}
+
+function handleCSVImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const lines = e.target.result.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { showToast('Empty CSV', 'error'); return; }
+      const headers = parseCSVRow(lines[0]);
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVRow(lines[i]);
+        const obj = {};
+        headers.forEach((h, j) => { obj[h] = values[j] || ''; });
+        if (obj.event_id) imported.push(obj);
+      }
+      showModal(
+        `Import ${imported.length} events?`,
+        events.length > 0
+          ? `This will merge with your existing ${events.length} events (new IDs will be assigned to duplicates).`
+          : `${imported.length} events will be added to your database.`,
+        () => {
+          const existingIds = new Set(events.map(e => String(e.event_id)));
+          let nextId = nextEventId();
+          imported.forEach(ev => {
+            if (existingIds.has(String(ev.event_id))) {
+              ev.event_id = nextId++;
+            }
+            events.push(ev);
+          });
+          saveEvents();
+          renderAll();
+          showToast(`Imported ${imported.length} events`);
+        }
+      );
+    } catch (err) {
+      showToast('CSV parse error: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  document.getElementById('csv-file').value = '';
+}
+
+function parseCSVRow(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"' && line[i+1] === '"') { cur += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { cur += c; }
+    } else {
+      if (c === ',') { result.push(cur); cur = ''; }
+      else if (c === '"') { inQuotes = true; }
+      else { cur += c; }
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function confirmClear() {
+  showModal(
+    'Clear all data?',
+    `This will permanently delete all ${events.length} tagged events. Export first if you want to keep them.`,
+    async () => {
+      events = [];
+      saveEvents();
+      clearDraft();
+      try { await dbClear(); } catch (err) { /* ignore */ }
+      resetForm();
+      renderAll();
+      updateStorageMeter();
+      showToast('All data cleared');
+    }
+  );
+}
+
+// ============================================================================
+// UI: TOAST, MODAL
+// ============================================================================
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 2400);
+}
+
+function showModal(title, text, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-text').textContent = text;
+  const btn = document.getElementById('modal-confirm');
+  btn.onclick = () => { hideModal(); onConfirm(); };
+  document.getElementById('modal-bg').classList.add('show');
+}
+
+function hideModal() {
+  document.getElementById('modal-bg').classList.remove('show');
+}
+
+function toggleTagHelp() {
+  // Visual feedback that the tag is set
+  const help = document.querySelector('details.help');
+  if (help && document.getElementById('tag').value) {
+    help.open = false;
+  }
+}
+
+// ============================================================================
+// KEYBOARD SHORTCUTS
+// ============================================================================
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('event-form').requestSubmit();
+  }
+  if (e.key === 'Escape') {
+    if (document.getElementById('modal-bg').classList.contains('show')) hideModal();
+    if (document.getElementById('lightbox').classList.contains('show')) {
+      document.getElementById('lightbox').classList.remove('show');
+    }
+  }
+});
+
+// Auto-save draft on every form change
+document.getElementById('event-form').addEventListener('input', saveDraft);
+document.getElementById('event-form').addEventListener('change', saveDraft);
+
+// ============================================================================
+// INIT
+// ============================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  // Pre-fill datetime to now if empty
+  const dt = document.getElementById('datetime');
+  if (!dt.value) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    dt.value = now.toISOString().slice(0, 16);
+  }
+  // Wire up image dropzones
+  ['dz-signal', 'dz-outcome'].forEach(id => {
+    const dz = document.getElementById(id);
+    if (dz) wireDropzone(dz);
+  });
+  setupPasteRouting();
+  loadDraft();
+  renderAll();
+  updateStorageMeter();
+});
+</script>
+</body>
+</html>
