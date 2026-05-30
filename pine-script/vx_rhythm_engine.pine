@@ -1,0 +1,207 @@
+//@version=5
+// =============================================================================
+// vX Rhythm Engine™ v0.1
+// Market rhythm intelligence: channel traversal · liquidity · compression
+// · expansion · exhaustion. Replay-safe · non-repainting · low render load.
+// =============================================================================
+indicator("vX Rhythm Engine™", shorttitle="vX RHYTHM", overlay=true,
+     max_lines_count=120, max_labels_count=50, max_boxes_count=20)
+
+// ─── INPUTS ──────────────────────────────────────────────────────────────────
+gC  = "Adaptive Channel"
+chanLen   = input.int(50,  "Channel Length",            minval=10,  maxval=500, group=gC)
+chanMult  = input.float(2.0,"Channel Width (σ mult)",   minval=0.5, maxval=4.0, step=0.1, group=gC)
+adaptive  = input.bool(true,"Adaptive Width (ATR-scaled)",                                  group=gC)
+
+gA  = "ATR / Normalization"
+atrLen    = input.int(14,  "ATR Length",          minval=2,  group=gA)
+atrSlow   = input.int(50,  "ATR Baseline Length", minval=10, group=gA)
+
+gR  = "Rhythm Scoring"
+cadenceLen  = input.int(10,   "Cadence Window",                 minval=3,    group=gR)
+compressTh  = input.float(0.65,"Compression Threshold (rel)",   step=0.05,   group=gR)
+expansionTh = input.float(1.35,"Expansion Threshold (rel)",     step=0.05,   group=gR)
+exhaustZ    = input.float(2.0, "Exhaustion |Z|",                step=0.1,    group=gR)
+
+gL  = "Liquidity Memory"
+pivotL    = input.int(5,    "Pivot Left",   minval=1, group=gL)
+pivotR    = input.int(5,    "Pivot Right",  minval=1, group=gL)
+maxZones  = input.int(8,    "Max zones (each side)", minval=2, maxval=20, group=gL)
+showZones = input.bool(true,"Show liquidity zones",  group=gL)
+
+gV  = "Visual"
+showChannel = input.bool(true, "Channel",            group=gV)
+showFill    = input.bool(true, "Channel fill",       group=gV)
+showRibbon  = input.bool(true, "State ribbon (bg)",  group=gV)
+colorBars   = input.bool(false,"Color bars by state",group=gV)
+showDash    = input.bool(true, "Dashboard",          group=gV)
+dashPos     = input.string("top_right","Dashboard position",
+     options=["top_left","top_right","bottom_left","bottom_right"], group=gV)
+
+// Institutional dark palette
+cMid     = color.new(#8a93a3, 50)
+cRail    = color.new(#5c6370, 30)
+cFillN   = color.new(#1f2733, 92)
+cFillB   = color.new(#1faf6f, 92)
+cFillS   = color.new(#d65f5f, 92)
+cCompr   = color.new(#3a86ff, 0)   // blue
+cExpan   = color.new(#06d6a0, 0)   // mint
+cTrav    = color.new(#e5e7eb, 0)   // near-white
+cExh     = color.new(#f4a261, 0)   // amber
+cNeu     = color.new(#6b7280, 0)   // gray
+cLqLive  = color.new(#9aa0a6, 30)
+cLqTaken = color.new(#9aa0a6, 80)
+cText    = color.new(#e5e7eb, 0)
+cTextDim = color.new(#9aa0a6, 0)
+
+// ─── ATR + ADAPTIVE CHANNEL ─────────────────────────────────────────────────
+atrF  = ta.atr(atrLen)
+atrS  = ta.atr(atrSlow)
+atrR  = atrS > 0 ? atrF / atrS : 1.0          // >1 expanding · <1 compressing
+
+mid   = ta.linreg(close, chanLen, 0)
+dev   = ta.stdev(close, chanLen)
+wMult = adaptive ? chanMult * math.max(0.6, math.min(1.6, atrR)) : chanMult
+upper = mid + wMult * dev
+lower = mid - wMult * dev
+chW   = upper - lower
+chWA  = atrF > 0 ? chW / atrF : 0             // channel width in ATR units
+
+pos   = chW > 0 ? math.max(0.0, math.min(1.0, (close - lower) / chW)) : 0.5
+slope = (mid - mid[5]) / 5
+slopA = atrF > 0 ? slope / atrF : 0           // ATR-normalized slope
+
+// ─── MOMENTUM CADENCE ───────────────────────────────────────────────────────
+ret    = close - close[1]
+retA   = atrF > 0 ? ret / atrF : 0
+impulse = math.abs(retA) > 0.5 ? 1 : 0
+cadence = math.sum(impulse, cadenceLen) / cadenceLen   // 0..1
+netImp  = math.sum(retA, cadenceLen)                   // signed push
+
+// ─── COMPRESSION / EXPANSION ────────────────────────────────────────────────
+wBase = ta.sma(chWA, 50)
+wRel  = wBase > 0 ? chWA / wBase : 1.0
+isCompression = wRel < compressTh and atrR < 1.0
+isExpansion   = wRel > expansionTh or atrR > 1.2
+
+var int compressBars = 0
+compressBars := isCompression ? compressBars + 1 : 0
+
+// ─── EXHAUSTION ─────────────────────────────────────────────────────────────
+zScore  = dev > 0 ? (close - mid) / dev : 0
+absRetF = ta.ema(math.abs(retA), 5)
+absRetS = ta.ema(math.abs(retA), 14)
+fading  = absRetF < absRetS
+isExhaustion = math.abs(zScore) > exhaustZ and fading
+
+// ─── TRAVERSAL SCORING ─────────────────────────────────────────────────────
+roomUp   = 1.0 - pos
+roomDn   = pos
+trendC   = math.max(-1.0, math.min(1.0, slopA * 5))
+pushC    = math.max(-1.0, math.min(1.0, netImp / 5))
+bullRaw  = 0.35*math.max(0,pushC) + 0.25*math.max(0,trendC)  + 0.20*cadence + 0.20*roomUp
+bearRaw  = 0.35*math.max(0,-pushC)+ 0.25*math.max(0,-trendC) + 0.20*cadence + 0.20*roomDn
+bullSc   = math.round(bullRaw * 100)
+bearSc   = math.round(bearRaw * 100)
+netSc    = bullSc - bearSc
+
+// ─── RHYTHM STATE ──────────────────────────────────────────────────────────
+// Priority: Exhaustion → Compression → Expansion → Traversal → Neutral
+state = "NEUTRAL"
+if isExhaustion
+    state := "EXHAUSTION"
+else if isCompression
+    state := "COMPRESSION"
+else if isExpansion
+    state := "EXPANSION"
+else if math.abs(netSc) > 35
+    state := "TRAVERSAL"
+
+stateColor = state == "EXHAUSTION"  ? cExh   :
+             state == "COMPRESSION" ? cCompr :
+             state == "EXPANSION"   ? cExpan :
+             state == "TRAVERSAL"   ? cTrav  : cNeu
+
+// ─── CHANNEL VISUAL ────────────────────────────────────────────────────────
+pM = plot(showChannel ? mid   : na, "Mid",   color=cMid,  linewidth=1)
+pU = plot(showChannel ? upper : na, "Upper", color=cRail, linewidth=1)
+pL = plot(showChannel ? lower : na, "Lower", color=cRail, linewidth=1)
+fillC = not showFill ? na : (netSc > 15 ? cFillB : netSc < -15 ? cFillS : cFillN)
+fill(pU, pL, color=fillC, title="Channel Fill")
+
+bgcolor(showRibbon and state != "NEUTRAL" ? color.new(stateColor, 88) : na, title="State Ribbon")
+barcolor(colorBars ? stateColor : na)
+
+// ─── LIQUIDITY MEMORY ZONES ────────────────────────────────────────────────
+ph = ta.pivothigh(high, pivotL, pivotR)
+pl = ta.pivotlow (low,  pivotL, pivotR)
+
+var line[]  hiLn = array.new<line>()
+var float[] hiLv = array.new<float>()
+var bool[]  hiTk = array.new<bool>()
+var line[]  loLn = array.new<line>()
+var float[] loLv = array.new<float>()
+var bool[]  loTk = array.new<bool>()
+
+if showZones and not na(ph)
+    px = bar_index - pivotR
+    ln = line.new(px, ph, bar_index, ph, color=cLqLive, width=1, extend=extend.right)
+    array.push(hiLn, ln), array.push(hiLv, ph), array.push(hiTk, false)
+    if array.size(hiLn) > maxZones
+        line.delete(array.shift(hiLn))
+        array.shift(hiLv), array.shift(hiTk)
+
+if showZones and not na(pl)
+    px = bar_index - pivotR
+    ln = line.new(px, pl, bar_index, pl, color=cLqLive, width=1, extend=extend.right)
+    array.push(loLn, ln), array.push(loLv, pl), array.push(loTk, false)
+    if array.size(loLn) > maxZones
+        line.delete(array.shift(loLn))
+        array.shift(loLv), array.shift(loTk)
+
+// Sweep detection
+if showZones and array.size(hiLn) > 0
+    for i = 0 to array.size(hiLn) - 1
+        if not array.get(hiTk, i) and high > array.get(hiLv, i)
+            array.set(hiTk, i, true)
+            line.set_color(array.get(hiLn, i), cLqTaken)
+            line.set_style(array.get(hiLn, i), line.style_dotted)
+
+if showZones and array.size(loLn) > 0
+    for i = 0 to array.size(loLn) - 1
+        if not array.get(loTk, i) and low < array.get(loLv, i)
+            array.set(loTk, i, true)
+            line.set_color(array.get(loLn, i), cLqTaken)
+            line.set_style(array.get(loLn, i), line.style_dotted)
+
+// ─── DASHBOARD ─────────────────────────────────────────────────────────────
+tablePos = dashPos == "top_left"     ? position.top_left  :
+           dashPos == "top_right"    ? position.top_right :
+           dashPos == "bottom_left"  ? position.bottom_left : position.bottom_right
+
+var table dash = table.new(tablePos, 2, 7,
+     bgcolor=color.new(#0d1117, 20), border_width=1, border_color=color.new(#1f2733, 40))
+
+if showDash and barstate.islast
+    table.cell(dash, 0, 0, "RHYTHM",      text_color=cText,    text_size=size.small)
+    table.cell(dash, 1, 0, state,         text_color=stateColor, text_size=size.small)
+    table.cell(dash, 0, 1, "ATR Ratio",   text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 1, str.tostring(atrR, "#.##"),                      text_color=cText, text_size=size.tiny)
+    table.cell(dash, 0, 2, "Width (ATR)", text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 2, str.tostring(chWA, "#.##"),                      text_color=cText, text_size=size.tiny)
+    table.cell(dash, 0, 3, "Position",    text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 3, str.tostring(pos * 100, "#") + "%",              text_color=cText, text_size=size.tiny)
+    table.cell(dash, 0, 4, "Cadence",     text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 4, str.tostring(cadence * 100, "#") + "%",          text_color=cText, text_size=size.tiny)
+    table.cell(dash, 0, 5, "Bull / Bear", text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 5, str.tostring(bullSc) + " / " + str.tostring(bearSc), text_color=cText, text_size=size.tiny)
+    table.cell(dash, 0, 6, "Z-Score",     text_color=cTextDim, text_size=size.tiny)
+    table.cell(dash, 1, 6, str.tostring(zScore, "#.##"),
+         text_color=math.abs(zScore) > exhaustZ ? cExh : cText, text_size=size.tiny)
+
+// ─── ALERTS ────────────────────────────────────────────────────────────────
+alertcondition(isCompression and not isCompression[1], "Compression Onset", "vX: Compression onset")
+alertcondition(isExpansion   and not isExpansion[1],   "Expansion Onset",   "vX: Expansion onset")
+alertcondition(isExhaustion  and not isExhaustion[1],  "Exhaustion",        "vX: Exhaustion detected")
+alertcondition(ta.crossover(netSc, 50),   "Bullish Traversal", "vX: Bullish traversal score > 50")
+alertcondition(ta.crossunder(netSc, -50), "Bearish Traversal", "vX: Bearish traversal score < -50")

@@ -1,0 +1,297 @@
+//@version=5
+indicator("vX Rhythm Engine™", shorttitle="vXRE", overlay=true,
+     max_lines_count=100, max_boxes_count=50, max_labels_count=50)
+
+// ══════════════════════════════════════════════════════════════
+//  vX Rhythm Engine™  |  Engineering Spec v0.1
+//  ATR Adaptive Channels · Multi-TF · Replay-Safe · No-Repaint
+// ══════════════════════════════════════════════════════════════
+
+// ─── INPUTS ──────────────────────────────────────────────────
+
+var G_CH   = "● Channel"
+atr_len    = input.int   (14,    "ATR Length",             group=G_CH, minval=1)
+basis_len  = input.int   (50,    "Basis Length",           group=G_CH, minval=5)
+ch_mult    = input.float (2.0,   "Channel Width  (ATR ×)", group=G_CH, step=0.1, minval=0.5)
+basis_type = input.string("EMA", "Basis Type",             group=G_CH, options=["EMA","SMA","WMA"])
+
+var G_MTF  = "● Multi-TF"
+use_htf    = input.bool      (true, "Enable HTF Overlay",  group=G_MTF)
+htf_auto   = input.bool      (true, "Auto-Detect HTF",     group=G_MTF)
+htf_manual = input.timeframe ("60", "Manual HTF Override", group=G_MTF)
+
+var G_RHY  = "● Rhythm Engine"
+comp_thr   = input.float(0.75, "Compression Threshold",
+     group=G_RHY, step=0.05, minval=0.3, maxval=1.0,
+     tooltip="ATR ÷ ATR-avg below this = compression state")
+exh_ext    = input.float(0.5,  "Exhaustion Extension  (ATR ×)",
+     group=G_RHY, step=0.1, minval=0.1,
+     tooltip="ATR multiples beyond channel = exhaustion zone")
+cad_len    = input.int  (14,   "Cadence RSI Length",      group=G_RHY, minval=2)
+liq_lb     = input.int  (100,  "Liquidity Lookback  (bars)", group=G_RHY, minval=20)
+liq_pct    = input.int  (20,   "Consolidation ATR Percentile",
+     group=G_RHY, minval=5, maxval=45,
+     tooltip="ATR below this percentile = liquidity / consolidation zone")
+
+var G_VIS  = "● Visuals"
+show_ch    = input.bool(true,  "LTF Channel",     group=G_VIS)
+show_htf   = input.bool(true,  "HTF Channel",     group=G_VIS)
+show_liq   = input.bool(true,  "Liquidity Zones", group=G_VIS)
+show_bg    = input.bool(true,  "Background Tint", group=G_VIS)
+show_dash  = input.bool(true,  "Dashboard",       group=G_VIS)
+
+var G_AL   = "● Alerts"
+al_comp    = input.bool(true, "Compression Trigger", group=G_AL)
+al_exp     = input.bool(true, "Expansion Ignition",  group=G_AL)
+al_exh     = input.bool(true, "Exhaustion Zone",     group=G_AL)
+al_trav    = input.bool(true, "Full Traversal",      group=G_AL)
+
+// ─── PALETTE ─────────────────────────────────────────────────
+C_BULL = #00e5ff
+C_BEAR = #ff4081
+C_GOLD = #ffd600
+C_PURP = #7c4dff
+C_GREY = #90a4ae
+C_BG   = #0d1117
+
+// ─── AUTO-HTF MAP ────────────────────────────────────────────
+f_auto_htf() =>
+    switch timeframe.period
+        "1"   => "15"
+        "2"   => "15"
+        "3"   => "30"
+        "5"   => "60"
+        "10"  => "60"
+        "15"  => "240"
+        "30"  => "240"
+        "45"  => "D"
+        "60"  => "D"
+        "120" => "D"
+        "240" => "W"
+        "D"   => "W"
+        "W"   => "M"
+        => "D"
+
+htf = htf_auto ? f_auto_htf() : htf_manual
+
+// ─── BASIS ───────────────────────────────────────────────────
+f_basis(float src, int len) =>
+    switch basis_type
+        "SMA" => ta.sma(src, len)
+        "WMA" => ta.wma(src, len)
+        =>       ta.ema(src, len)
+
+// ─── ATR & CHANNEL CORE ──────────────────────────────────────
+atr       = ta.atr(atr_len)
+atr_avg   = ta.sma(atr, atr_len * 3)
+atr_ratio = atr_avg > 0 ? atr / atr_avg : 1.0
+
+basis     = f_basis(close, basis_len)
+ch_upper  = basis + ch_mult * atr
+ch_lower  = basis - ch_mult * atr
+ch_width  = ch_upper - ch_lower
+
+exh_u     = basis + (ch_mult + exh_ext) * atr   // exhaustion ceiling
+exh_l     = basis - (ch_mult + exh_ext) * atr   // exhaustion floor
+
+// ─── HTF CHANNEL  (no lookahead — replay safe) ───────────────
+[htf_u, htf_l, htf_b] = request.security(syminfo.tickerid, htf,
+     [f_basis(close, basis_len) + ch_mult * ta.atr(atr_len),
+      f_basis(close, basis_len) - ch_mult * ta.atr(atr_len),
+      f_basis(close, basis_len)],
+     lookahead=barmerge.lookahead_off)
+
+// ─── TRAVERSAL SCORE  (0 – 100%) ─────────────────────────────
+trav   = ch_width > 0 ? math.max(0.0, math.min(100.0,
+         (close - ch_lower) / ch_width * 100)) : 50.0
+trav1  = nz(trav[1], trav)
+t_dir  = trav > trav1 ? 1 : trav < trav1 ? -1 : 0
+
+bs_lo    = ta.barssince(trav < 20)
+bs_hi    = ta.barssince(trav > 80)
+trav_up  = trav > 80 and nz(bs_lo) < nz(bs_hi)  // lo → hi full sweep
+trav_dn  = trav < 20 and nz(bs_hi) < nz(bs_lo)  // hi → lo full sweep
+
+// ─── RHYTHM STATE MACHINE ────────────────────────────────────
+is_comp  = atr_ratio < comp_thr
+comp_bars = ta.barssince(not is_comp)
+
+is_exh_u = close > ch_upper                     // price above upper rail
+is_exh_l = close < ch_lower                     // price below lower rail
+is_exh   = is_exh_u or is_exh_l
+
+is_exp_u = atr_ratio >= 1.0 and close > basis and not is_comp and not is_exh
+is_exp_d = atr_ratio >= 1.0 and close < basis and not is_comp and not is_exh
+is_exp   = is_exp_u or is_exp_d
+
+state_str = is_exh  ? (is_exh_u ? "EXHAUSTION ▲" : "EXHAUSTION ▼") :
+            is_comp ? "COMPRESSION"   :
+            is_exp_u? "EXPANSION ▲"   :
+            is_exp_d? "EXPANSION ▼"   :
+            t_dir>0 ? "TRAVERSAL ▲"   : "TRAVERSAL ▼"
+
+state_col = is_exh  ? (is_exh_u ? C_BULL : C_BEAR) :
+            is_comp ? C_GOLD :
+            is_exp_u? C_BULL :
+            is_exp_d? C_BEAR : C_GREY
+
+// ─── MOMENTUM CADENCE ────────────────────────────────────────
+rsi     = ta.rsi(close, cad_len)
+mom     = ta.mom(close, cad_len)
+mom_n   = ch_width > 0 ? mom / ch_width * 100 : 0.0
+
+cad_str = rsi > 58 and mom_n >  5 ? "BULL" :
+          rsi < 42 and mom_n < -5 ? "BEAR" : "NEUTRAL"
+cad_col = cad_str == "BULL" ? C_BULL : cad_str == "BEAR" ? C_BEAR : C_GREY
+
+// ─── LIQUIDITY MEMORY ZONES ──────────────────────────────────
+liq_thr  = ta.percentile_linear_interpolation(atr, liq_lb, liq_pct)
+is_liq   = atr < liq_thr
+
+var float liq_hi = na
+var float liq_lo = na
+
+if is_liq and not is_liq[1]        // zone starts
+    liq_hi := high
+    liq_lo := low
+else if is_liq                     // zone continues — extend range
+    liq_hi := math.max(liq_hi, high)
+    liq_lo := math.min(liq_lo, low)
+
+liq_mid = not na(liq_hi) and not na(liq_lo) ? (liq_hi + liq_lo) / 2 : na
+
+// ─── CHANNEL COLORS ──────────────────────────────────────────
+ch_fill  = color.new(state_col, is_exh ? 80 : is_comp ? 88 : 92)
+ch_line  = color.new(state_col, is_comp ? 35 : 15)
+
+// ─── PLOTS: LTF CHANNEL ──────────────────────────────────────
+pu = plot(show_ch ? ch_upper : na, "Upper Rail",
+     color=ch_line, linewidth=1)
+pl = plot(show_ch ? ch_lower : na, "Lower Rail",
+     color=ch_line, linewidth=1)
+     plot(show_ch ? basis    : na, "Basis",
+     color=color.new(C_GREY, 55), linewidth=1, style=plot.style_stepline)
+fill(pu, pl, color=ch_fill)
+
+// Exhaustion extension rails (dotted outer envelope)
+peu = plot(show_ch ? exh_u : na, "Exh Upper",
+     color=color.new(C_BULL, 75), linewidth=1, style=plot.style_circles)
+pel = plot(show_ch ? exh_l : na, "Exh Lower",
+     color=color.new(C_BEAR, 75), linewidth=1, style=plot.style_circles)
+
+// ─── PLOTS: HTF CHANNEL ──────────────────────────────────────
+phu = plot(show_htf and use_htf ? htf_u : na, "HTF Upper",
+     color=color.new(C_PURP, 45), linewidth=2)
+phl = plot(show_htf and use_htf ? htf_l : na, "HTF Lower",
+     color=color.new(C_PURP, 45), linewidth=2)
+fill(phu, phl, color=color.new(C_PURP, 93))
+     plot(show_htf and use_htf ? htf_b : na, "HTF Basis",
+     color=color.new(C_PURP, 60), linewidth=1, style=plot.style_stepline)
+
+// ─── PLOTS: LIQUIDITY ZONES ──────────────────────────────────
+plot(show_liq ? liq_hi  : na, "Liq High",
+     color=color.new(C_GOLD, 65), linewidth=1, style=plot.style_stepline)
+plot(show_liq ? liq_lo  : na, "Liq Low",
+     color=color.new(C_GOLD, 65), linewidth=1, style=plot.style_stepline)
+plot(show_liq ? liq_mid : na, "Liq Mid",
+     color=color.new(C_GOLD, 40), linewidth=1, style=plot.style_cross)
+
+// ─── BACKGROUND TINT ─────────────────────────────────────────
+bgcolor(show_bg and is_comp  ? color.new(C_GOLD, 96) : na, title="Compression BG")
+bgcolor(show_bg and is_exh_u ? color.new(C_BULL, 96) : na, title="Bull Exhaust BG")
+bgcolor(show_bg and is_exh_l ? color.new(C_BEAR, 96) : na, title="Bear Exhaust BG")
+
+// ─── DASHBOARD ───────────────────────────────────────────────
+var table T = table.new(position.top_right, 2, 10,
+     bgcolor      = C_BG,
+     border_color = color.new(C_GREY, 70), border_width = 1,
+     frame_color  = color.new(C_GREY, 50), frame_width  = 1)
+
+if show_dash and barstate.islast
+
+    // Header row
+    table.cell(T, 0, 0, "vX RHYTHM ENGINE™",
+         text_color=color.new(C_GREY,  5), text_size=size.small,
+         bgcolor=color.new(C_GREY, 82),   text_halign=text.align_left)
+    table.cell(T, 1, 0, timeframe.period + " › " + htf,
+         text_color=color.new(C_GREY, 30), text_size=size.tiny,
+         bgcolor=color.new(C_GREY, 82))
+
+    // Row 1 — Rhythm State
+    table.cell(T, 0, 1, "STATE",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 1, state_str,
+         text_color=state_col, text_size=size.small, bgcolor=C_BG)
+
+    // Row 2 — Traversal Score
+    trav_c = trav > 70 ? C_BULL : trav < 30 ? C_BEAR : C_GREY
+    table.cell(T, 0, 2, "TRAVERSAL",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 2, str.tostring(math.round(trav)) + "%",
+         text_color=trav_c, text_size=size.small, bgcolor=C_BG)
+
+    // Row 3 — ATR Ratio (normalized)
+    atr_c = atr_ratio < comp_thr ? C_GOLD : atr_ratio > 1.3 ? state_col : C_GREY
+    table.cell(T, 0, 3, "ATR RATIO",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 3, str.tostring(atr_ratio, "#.##") + "×",
+         text_color=atr_c, text_size=size.small, bgcolor=C_BG)
+
+    // Row 4 — Momentum Cadence
+    table.cell(T, 0, 4, "CADENCE",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 4, cad_str,
+         text_color=cad_col, text_size=size.small, bgcolor=C_BG)
+
+    // Row 5 — HTF Bias
+    htf_b_str = close > htf_b ? "ABOVE HTF ▲" : "BELOW HTF ▼"
+    htf_b_col = close > htf_b ? C_BULL : C_BEAR
+    table.cell(T, 0, 5, "HTF BIAS",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 5, htf_b_str,
+         text_color=htf_b_col, text_size=size.small, bgcolor=C_BG)
+
+    // Row 6 — RSI
+    rsi_c = rsi > 60 ? C_BULL : rsi < 40 ? C_BEAR : C_GREY
+    table.cell(T, 0, 6, "RSI",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 6, str.tostring(math.round(rsi)),
+         text_color=rsi_c, text_size=size.small, bgcolor=C_BG)
+
+    // Row 7 — Compression Duration
+    cb_str = is_comp ? str.tostring(nz(comp_bars)) + " bars" : "—"
+    cb_col = is_comp ? C_GOLD : color.new(C_GREY, 55)
+    table.cell(T, 0, 7, "COMP BARS",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 7, cb_str,
+         text_color=cb_col, text_size=size.small, bgcolor=C_BG)
+
+    // Row 8 — Liquidity Mid Price
+    liq_str = not na(liq_mid) ? str.tostring(liq_mid, "#.####") : "—"
+    table.cell(T, 0, 8, "LIQ MID",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 8, liq_str,
+         text_color=C_GOLD, text_size=size.small, bgcolor=C_BG)
+
+    // Row 9 — Raw ATR value
+    table.cell(T, 0, 9, "ATR",
+         text_color=color.new(C_GREY, 20), text_size=size.tiny, bgcolor=C_BG)
+    table.cell(T, 1, 9, str.tostring(atr, "#.#####"),
+         text_color=color.new(C_GREY, 25), text_size=size.small, bgcolor=C_BG)
+
+// ─── ALERT CONDITIONS ────────────────────────────────────────
+alertcondition(al_comp and     is_comp and not is_comp[1],
+     "vXRE · Compression",
+     "vX Rhythm Engine: COMPRESSION — await expansion ignition")
+
+alertcondition(al_exp  and     is_exp  and not is_exp[1],
+     "vXRE · Expansion",
+     "vX Rhythm Engine: EXPANSION confirmed — momentum active")
+
+alertcondition(al_exh  and     is_exh  and not is_exh[1],
+     "vXRE · Exhaustion",
+     "vX Rhythm Engine: EXHAUSTION zone — reversal or flush likely")
+
+alertcondition(al_trav and (trav_up or trav_dn),
+     "vXRE · Full Traversal",
+     "vX Rhythm Engine: FULL TRAVERSAL complete")
