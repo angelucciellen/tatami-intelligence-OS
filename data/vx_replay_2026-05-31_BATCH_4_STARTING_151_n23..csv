@@ -1,0 +1,43 @@
+event_id,datetime,session,rubric_version,ltf_state,ltf_dir,quality,compress,expansion,exhaust,htf1_state,htf1_dir,htf2_state,htf2_dir,sync,context,memory,rail_zone,htf_rail_align,zone_diversity,cascade,tag,outcome_dir,outcome_atr,mae_atr,notes,screenshot
+151,2026-01-07T21:00,London,,EXHAUSTION,DOWN,55,27,14,60,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,LOWER_RAIL,YES,,NO,WRONG,DOWN,1.4,2.2,Obs: I'm adding a arrow to the bar signal from this event #151 forward,event_151_signal.jpg | event_151_outcome.jpg
+152,2026-01-07T21:45,London,,FAILED,DOWN,41,8,14,27,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,MID_CHANNEL,NO,HIGH,OTHER,WRONG,DOWN,0.7,4.7,"time-filter: time-filter: pre-session/15 minutes before NY open
+Zone Diversity 3+ however the same color: Orange exactly at bar signal",event_152_signal.jpg | event_152_outcome.jpg
+153,2026-01-07T22:05,NY,,TRAVERSAL,DOWN,61,6,20,29,EXHAUSTION,DOWN,NEUTRAL,UP,CONFLICT,Counter-Trend,10,LOWER_RAIL,YES,,NO,WRONG,UP,0,3,NY Session open first 10 minutes bar signal 2 bar of the day ,event_153_signal.jpg | event_153_outcome.jpg
+154,2026-01-07T22:40,NY,,FAILED,DOWN,29,19,23,40,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,MID_CHANNEL,YES,,,LED,UP,1.3,0,"Bar arrow conflict: bullish bar whit bearish signal
+multiple Failed traversal signals in a row",event_154_signal.jpg | event_154_outcome.jpg
+155,2026-01-08T12:20,NY,,TRAVERSAL,DOWN,56,17,27,21,EXHAUSTION,DOWN,NEUTRAL,UP,CONFLICT,Counter-Trend,10,LOWER_RAIL,NO,,NO,CONFIRMED,UP,2.8,0,"bar-arrow-conflict: bullish bar whit bearish signal [from this event #155 on ill,  TAG: CONFIRMED if ""i think price moved according whit structure, exemple here: Bullish Bar and : WRONG if i don't , even if arrow dir is Flat or opposite side, maybe there's a system regulation and  not a wrong or led  event, double check this and find solution]
+",event_155_signal.jpg | event_155_outcome.jpg
+156,2026-01-08T12:55,NY,,FAILED,UP,42,21,17,19,EXHAUSTION,DOWN,NEUTRAL,UP,TRANSITION,Direction Conflict,9,MID_CHANNEL,YES,,NO,CONFIRMED,UP,2,0,"bar-arrow-conflict: Bullish bar with bearish signal, i noticed that this move up had a STATE: Failed Traversal/ Arrow up and market went up, opposite from the 7 Failed in a row whit arrow down from 22:25 until 22:50, however the last Failed at 22:55 had a Flat direction the price pushed strong to the down side.[ hypothesis, is the possibility we're reading the arrow wrong in this case it means that STATE : FAILED TRAVERSAL / arrow to the up side mean the price will move higher, investigate, look for similar patterns and let's figure it out]",event_156_signal.jpg | event_156_outcome.jpg
+157,2026-01-08T13:05,NY,,TRAVERSAL,UP,61,34,15,43,EXHAUSTION,DOWN,NEUTRAL,UP,CONFLICT,Counter-Trend,9,UPPER_RAIL,YES,,,LED,UP,2.5,0,"HTF Rail Align: dot lines = 60 Minutes rails, using the same thinking that price travels from one side of the rail [channel] to the other, low to high and back and forth this would be a good signal for a long entry targeting close to the upper 60 Minutes rail above and all the memory zones. [check screenshots please/investigate this pattern and if good,let me know]",event_157_signal.jpg | event_157_outcome.jpg
+158,2026-01-08T14:30,NY,,FAILED,DOWN,54,35,13,30,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Direction Conflict,10,,NO,HIGH,OTHER,LED,DOWN,2,0,"bar-arrow-conflict; ?
+Rail Zone: bar signal exact on the same level as mid rail
+Zone Diversity: 3+ all Orange zones 
+
+",event_158_signal.jpg | event_158_outcome.jpg
+159,2026-01-08T09:00,Tokyo,,TRAVERSAL,UP,55,38,18,43,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Direction Conflict,9,UPPER_RAIL,YES,MEDIUM,NO,WRONG,UP,3.5,1,"Rail Zone : almost touched LTF upper rail, left a long wick as price rejected.
+HTF Rail Align: The price touched 60 minutes middle rail that was also near the upper rail on the LTF, left a wick and closed lower, if 60 Minutes is Traversal to the Down side, it could be a great signal for start to watch for entries to the down side targeting the HTF lower rail,despite this event was ""wrong"" [/analyze this screenshot please,look for similar patterns]
+Zone Diversity: Blue and Red
+",event_159_signal.jpg | event_159_outcome.jpg
+160,2026-01-08T09:45,Tokyo,,TRAVERSAL,DOWN,68,9,26,39,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Macro Aligned,9,,,,NO,LAGGED,UP,0.8,3.9,"Rail Zone: bar signal closed aroung 1.5ATR or 5.6 [correct me if im wrong about measurement] points from LTF lower rail
+
+",event_160_signal.jpg | event_160_outcome.jpg
+161,2026-01-08T10:05,Tokyo,,TRAVERSAL,DOWN,57,6,13,25,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,9,MID_CHANNEL,YES,HIGH,,LED,DOWN,2.1,0,Bar-arrow-conflict [arrow indicating direction hyphothesis]  ,event_161_signal.jpg | event_161_outcome.jpg
+162,2026-01-08T10:45,Tokyo,,EXHAUSTION,DOWN,27,27,30,63,EXHAUSTION,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,LOWER_RAIL,,,,WRONG,DOWN,,1.4,"obs: Look at screenshot please, [can we also investigate the possibiliity/hyphotesis that also this especific STATE's arrow could mean the engine is telling the direction price probably going?]",event_162_signal.jpg | event_162_outcome.jpg
+163,2026-01-08T11:15,Tokyo,,TRAVERSAL,DOWN,58,4,34,41,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,LOWER_RAIL,YES,,,LED,DOWN,1.8,0,"Check this Screenshot please. this day Tokyo Session traded from one 60 minute rail to the other from 9:00 almost touching the opposite side around 11:15
+[also check #159 because that was the begining of the move]",event_163_signal.jpg | event_163_outcome.jpg
+164,2026-01-08T11:55,Tokyo,,FAILED,DOWN,41,29,33,28,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,11,MID_CHANNEL,,LOW,,WRONG,SIDEWAYS,0.8,0.8,,event_164_signal.jpg | event_164_outcome.jpg
+165,2026-01-08T13:00,Tokyo,,TRAVERSAL,DOWN,59,20,20,17,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,10,MID_CHANNEL,NO,LOW,,CONFIRMED,SIDEWAYS,0.5,0.5,,event_165_signal.jpg | event_165_outcome.jpg
+166,2026-01-08T13:40,Tokyo,,TRAVERSAL,DOWN,67,16,15,16,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,9,MID_CHANNEL,YES,,,LED,DOWN,1.6,0,"HTF Rail Align: after a pull back price continue trading towards 60M Lower rail after touching the upper side 9:00 in the morning.[look at 2' screenshot all the 3 time frames are alining]
+Cascade: Could it be that this day from event #161  bar signal _price pulls back strong towards a 3+ orange zones, then trades down again into a  red memory zone  #164 and continues down? [check screenshot]",event_166_signal.jpg | event_166_outcome.jpg
+167,2026-01-08T15:20,Tokyo,,FAILED,DOWN,44,12,13,20,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,9,MID_CHANNEL,YES,LOW,OTHER,LED,UP,2,0,"I set a rule to not to tag events in this time window, however i'll change the rules if i see something interesting i'll add to the data sample.
+HTF Rail Align: the last 20'30 minutes of Tokyo session the price touched/cross over all the 3 time frames,from the begning of the day untill the end from one sessiom. bigger dot levels = 240 minutes.",event_167_signal.jpg | event_167_outcome.jpg
+168,2026-01-08T15:50,Tokyo,,TRAVERSAL,UP,67,25,11,39,NEUTRAL,DOWN,NEUTRAL,DOWN,TRANSITION,Direction Conflict,9,UPPER_RAIL,,,,LED,UP,1,0,"time-filter: London pre-session
+",event_168_signal.jpg | event_168_outcome.jpg
+169,2026-01-08T16:55,London,,TRAVERSAL,UP,56,22,8,20,NEUTRAL,DOWN,NEUTRAL,UP,TRANSITION,Direction Conflict,9,MID_CHANNEL,,,,LED,DOWN,1,0,"bar-arrow-conflict: bearish bar /arrow up
+[check sreenshot,i think theres a pattern forming here/let me know what you're seing]",event_169_signal.jpg | event_169_outcome.jpg
+170,2026-01-08T18:00,London,,FAILED,FLAT,40,37,12,31,NEUTRAL,DOWN,NEUTRAL,UP,CONFLICT,Mixed,11,MID_CHANNEL,NO,MEDIUM,,CONFIRMED,SIDEWAYS,1,1.2,"bar-arrow-conflict: Dir= flat [we should define this correctly first ill add for the data but not tag
+[look screenshots/let me know what you think]",event_170_signal.jpg | event_170_outcome.jpg
+171,2026-01-08T19:40,London,,FAILED,DOWN,30,41,8,50,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Mixed,11,UPPER_RAIL,,HIGH,,CONFIRMED,DOWN,1,0,"Bar_error_conflict
+[look at screenshots, i'm still on the move/let me know]",event_171_signal.jpg | event_171_outcome.jpg
+172,2026-01-08T21:00,London,,TRAVERSAL,DOWN,65,17,22,49,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Macro Aligned,11,,,LOW,,LED,DOWN,2.6,0,[keep watching this screenshots sequence please},event_172_signal.jpg | event_172_outcome.jpg
+173,2026-01-08T21:15,London,,EXHAUSTION,DOWN,42,10,26,28,TRAVERSAL,DOWN,NEUTRAL,UP,TRANSITION,Pullback in Trend,12,LOWER_RAIL,YES,LOW,,LED,UP,3.5,0,"[this tag finalized a sequence that i wanted to show you/let let know what do you think, about my trades and about if you think it's a good idea to show you some patterns once in a while, so we can learn more with each other]",event_173_signal.jpg | event_173_outcome.jpg
