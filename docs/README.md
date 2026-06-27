@@ -1,152 +1,214 @@
-# TATAMI 
+# TATAMI OS Documentation
 
-### Behavioral Market Intelligence
+## Documentation Index
 
-*"Markets do not behave randomly. They express behavior. Our job is not to predict the future—it is to understand the present."*
-
----
-
-## What is TATAMI?
-
-TATAMI is a Behavioral Market Intelligence platform dedicated to understanding how financial markets behave.
-
-Rather than attempting to predict price direction, TATAMI classifies market behavior through observable evidence, historical context, and continuous research.
-
-The platform combines behavioral classification, macro intelligence, replay analysis, historical memory, and AI-assisted reasoning into a single research environment designed to improve decision quality.
-
-Its purpose is not to replace human judgment.
-
-Its purpose is to make human judgment more informed.
+*"Understanding begins with structure."*
 
 ---
 
-## Our Philosophy
+# Welcome
 
-Traditional trading systems begin with a prediction.
+Welcome to the official documentation of **TATAMI OS**.
 
-TATAMI begins with observation.
+This documentation defines the architecture, philosophy, methodology, and long-term vision of the platform.
 
-Every decision inside the platform follows four principles:
+Rather than describing software features, these documents describe how TATAMI thinks, learns, and evolves.
 
-* Observation over Prediction
-* Classification over Opinion
-* Process over Outcome
-* Continuous Learning over Fixed Rules
-
-Behavior comes first.
-
-Direction comes later.
+If you are new to the project, follow the documents in the recommended order below.
 
 ---
 
-## The TATAMI Framework
+# Documentation Roadmap
 
-TATAMI is built as a collection of independent but connected systems.
+## 1. Constitution
 
-### The Mechanism
+**File**
 
-The behavioral classification engine.
+`CONSTITUTION.md`
 
-Responsible for identifying market states, behavioral transitions, and structural context.
+**Purpose**
 
----
+Defines the purpose, identity, and guiding principles of TATAMI OS.
 
-### GT Framework
-
-The research methodology.
-
-Transforms observations into repeatable behavioral knowledge through structured tagging, validation, and statistical analysis.
+Read this first.
 
 ---
 
-### Renaissance
+## 2. Architecture
 
-The intelligence interface.
+**File**
 
-Transforms data into visual understanding by combining market behavior, macro context, historical memory, and AI reasoning into a single decision workspace.
+`ARCHITECTURE.md`
 
----
+**Purpose**
 
-### Memory
+Explains how TATAMI is organized internally.
 
-A permanent behavioral database.
-
-Every observation, experiment, replay, and discovery becomes searchable knowledge that improves future research.
+Introduces the five core pillars of the platform and how information flows between them.
 
 ---
 
-### Intelligence
+## 3. Roadmap
 
-A growing collection of AI agents that assist—not replace—the researcher by organizing information, comparing historical events, discovering recurring patterns, and helping build higher-confidence decisions.
+**File**
 
----
+`ROADMAP.md`
 
-## Intelligence Pipeline
+**Purpose**
 
-```
-Market Data
-        ↓
-Behavior Classification
-        ↓
-Context & Macro Analysis
-        ↓
-Confidence Assessment
-        ↓
-Scenario Building
-        ↓
-Replay & Learning
-        ↓
-Behavioral Intelligence
-```
+Describes the evolution of TATAMI from its current state toward its long-term vision.
+
+This document explains what is being built and why.
 
 ---
 
-## Current Development Stage
+## 4. The Mechanism™
 
-TATAMI is currently focused on building its Behavioral Intelligence foundation.
+**File**
 
-The platform is progressing through successive research phases, transforming validated behavioral discoveries into scalable software architecture.
+`THE_MECHANISM.md`
 
-The objective is to create a system capable of continuously learning from market behavior while preserving transparency, explainability, and statistical rigor.
+**Purpose**
 
----
+Defines the behavioral classification engine at the core of TATAMI.
 
-## Repository Structure
-
-```
-docs/
-architecture/
-gt/
-research/
-knowledge/
-backend/
-frontend/
-data/
-tests/
-```
-
-Each directory represents a different layer of the platform, separating research, architecture, implementation, and historical knowledge into clearly defined components.
+Explains how market behavior is transformed into structured behavioral understanding.
 
 ---
 
-## Vision
+## 5. Knowledge Model
 
-The long-term vision of TATAMI is to become a Behavioral Market Intelligence platform where research, artificial intelligence, historical memory, and behavioral classification work together to help researchers understand markets with greater clarity.
+**File**
 
-The objective is not to automate trading.
+`KNOWLEDGE_MODEL.md`
 
-The objective is to build an intelligence system capable of continuously learning how markets behave.
+**Purpose**
+
+Defines how observations become knowledge, how knowledge becomes memory, and how memory strengthens intelligence.
+
+This document explains the lifecycle of knowledge inside TATAMI.
 
 ---
 
-## Building the Future
+## 6. Lexicon
 
-Every discovery begins as an observation.
+**File**
 
-Every observation becomes research.
+`LEXICON.md`
 
-Every validated discovery becomes knowledge.
+**Purpose**
 
-Every piece of knowledge strengthens the intelligence of the system.
+Defines the official language of TATAMI.
 
-That is how TATAMI evolves.
+Every important concept used throughout the platform is described here using consistent terminology.
+
+---
+
+## 7. Philosophy
+
+**File**
+
+`PHILOSOPHY.md`
+
+**Purpose**
+
+Explains how TATAMI approaches markets, research, intelligence, and learning.
+
+This document represents the thinking behind the platform.
+
+---
+
+## 8. Vision
+
+**File**
+
+`VISION.md`
+
+**Purpose**
+
+Describes the long-term future of TATAMI and the broader mission the platform seeks to achieve.
+
+---
+
+## 9. Principles
+
+**File**
+
+`PRINCIPLES.md`
+
+**Purpose**
+
+Defines the engineering and research principles that guide every technical and architectural decision.
+
+Every future feature should align with these principles.
+
+---
+
+## 10. Renaissance Protocol
+
+**File**
+
+`RENAISSANCE_PROTOCOL.md`
+
+**Purpose**
+
+Defines how artificial intelligence reasons inside TATAMI.
+
+Explains how behavioral evidence, historical knowledge, macro context, uncertainty, and probability are combined into coherent market intelligence.
+
+---
+
+# Relationship Between Documentation and Knowledge
+
+The `docs/` directory defines **how the platform works**.
+
+The `knowledge/` directory contains **what the platform has learned**.
+
+These responsibilities are intentionally separated.
+
+Documentation changes slowly.
+
+Knowledge grows continuously through research.
+
+---
+
+# Suggested Reading Order
+
+For new contributors:
+
+1. Constitution
+2. Architecture
+3. Roadmap
+4. The Mechanism
+5. Knowledge Model
+6. Lexicon
+7. Philosophy
+8. Vision
+9. Principles
+10. Renaissance Protocol
+
+Following this order provides a complete understanding of TATAMI before exploring the implementation.
+
+---
+
+# Documentation Philosophy
+
+The purpose of this documentation is not only to explain software.
+
+It is to establish a common understanding between researchers, developers, artificial intelligence, and future contributors.
+
+Every document should answer one question clearly.
+
+Every concept should have one meaning.
+
+Every architectural decision should be explainable.
+
+As TATAMI evolves, these documents will evolve alongside it while preserving the core identity of the platform.
+
+---
+
+*"Architecture creates structure.*
+
+*Knowledge creates intelligence.*
+
+*Documentation preserves both."*
