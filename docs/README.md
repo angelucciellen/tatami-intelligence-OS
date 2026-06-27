@@ -27,7 +27,7 @@ If you are new to the project, follow the documents in the recommended order bel
 `CONSTITUTION.md`
 
 **Purpose**
-
+ 
 Defines the purpose, identity, and guiding principles of TATAMI OS.
 
 Read this first.
