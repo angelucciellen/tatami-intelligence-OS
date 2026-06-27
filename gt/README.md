@@ -1,3 +1,0 @@
-# GT
-
-Behavioral Classification Engine
