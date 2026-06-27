@@ -6,7 +6,7 @@
  
 ---
 
-# Vision
+# Vision 
 
 TATAMI OS is being developed as a Behavioral Market Intelligence Platform.
 
