@@ -1,6 +1,6 @@
 # TATAMI OS Philosophy
 
-## Version 1.0
+## Version 1.0 
 
 *"Intelligence begins with observation."*
 
