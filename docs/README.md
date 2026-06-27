@@ -5,7 +5,7 @@
 *"Understanding begins with structure."*
 
 ---
-
+ 
 # Welcome
 
 Welcome to the official documentation of **TATAMI OS**.
