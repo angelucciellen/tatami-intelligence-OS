@@ -1,4 +1,4 @@
-# TATAMI
+# TATAMI 
 
 ### Behavioral Market Intelligence
 
